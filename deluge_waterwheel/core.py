@@ -12,9 +12,13 @@ import logging
 
 import six
 
+# noinspection PyPackageRequirements
 import deluge.configmanager
+# noinspection PyPackageRequirements
 from deluge import component
+# noinspection PyPackageRequirements
 from deluge.core.rpcserver import export
+# noinspection PyPackageRequirements
 from deluge.plugins.pluginbase import CorePluginBase
 
 log = logging.getLogger(__name__)
