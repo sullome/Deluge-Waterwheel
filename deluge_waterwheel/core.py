@@ -14,10 +14,13 @@ import six
 
 # noinspection PyPackageRequirements
 import deluge.configmanager
+
 # noinspection PyPackageRequirements
 from deluge import component
+
 # noinspection PyPackageRequirements
 from deluge.core.rpcserver import export
+
 # noinspection PyPackageRequirements
 from deluge.plugins.pluginbase import CorePluginBase
 
@@ -47,7 +50,32 @@ def update_torrent_priorities(torrent_id, top=1, second=1):
     """Adjust files priorities for a specified torrent"""
 
     torrent = component.get("TorrentManager").torrents[torrent_id]
-    # TODO
+    files = torrent.get_files()
+    priorities = torrent.get_file_priorities()
+    progress = torrent.get_file_progress()
+
+    # From deluge/core/torrent.py
+    #
+    # files (list of dict):
+    #   The files this torrent contains
+    #   The format for the file dict::
+    #     {
+    #       "index": int,
+    #       "path": str,
+    #       "size": int,
+    #       "offset": int
+    #     }
+    #
+    # file_priorities (list of int):
+    #   The priority for files in torrent, range is [0..7] however
+    #   only [0, 1, 4, 7] are normally used and correspond to [Skip, Low, Normal, High]
+    #
+    # file_progress (list of floats):
+    #   The file progress (0.0 -> 1.0), empty list if n/a.
+
+    # TODO: modify priorities
+
+    torrent.set_file_priorities(priorities)
 
 
 class Core(CorePluginBase):
