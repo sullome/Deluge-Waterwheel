@@ -9,6 +9,7 @@
 from __future__ import unicode_literals
 
 import logging
+from collections import namedtuple
 
 import six
 
@@ -27,11 +28,15 @@ from deluge.plugins.pluginbase import CorePluginBase
 log = logging.getLogger(__name__)
 
 DEFAULT_PREFS = {
-    "order": "alphabetical",
+    "order": "alphabetical",  # TODO: put to use
     "labels": [],
     "amount_top": 1,
     "amount_second": 2,
 }
+
+# Values are given in deluge/core/torrent.py
+Priority = namedtuple("Priority", ["skip", "low", "normal", "high"])
+PRIORITY = Priority(0, 1, 4, 7)
 
 
 def get_torrent_ids_by_label(labeled_torrents, required_label):
@@ -47,33 +52,52 @@ def get_torrent_ids_by_label(labeled_torrents, required_label):
 
 
 def update_torrent_priorities(torrent_id, top=1, second=1):
-    """Adjust files priorities for a specified torrent"""
+    """Adjust files priorities for a specified torrent
+
+    From deluge/core/torrent.py
+
+    files (list of dict):
+        The files this torrent contains
+        The format for the file dict::
+            {
+                "index": int,
+                "path": str,
+                "size": int,
+                "offset": int
+            }
+
+    file_priorities (list of int):
+        The priority for files in torrent, range is [0..7] however
+        only [0, 1, 4, 7] are normally used and correspond to [Skip, Low, Normal, High]
+
+    file_progress (list of floats):
+        The file progress (0.0 -> 1.0), empty list if n/a.
+    """
 
     torrent = component.get("TorrentManager").torrents[torrent_id]
     files = torrent.get_files()
     priorities = torrent.get_file_priorities()
     progress = torrent.get_file_progress()
 
-    # From deluge/core/torrent.py
-    #
-    # files (list of dict):
-    #   The files this torrent contains
-    #   The format for the file dict::
-    #     {
-    #       "index": int,
-    #       "path": str,
-    #       "size": int,
-    #       "offset": int
-    #     }
-    #
-    # file_priorities (list of int):
-    #   The priority for files in torrent, range is [0..7] however
-    #   only [0, 1, 4, 7] are normally used and correspond to [Skip, Low, Normal, High]
-    #
-    # file_progress (list of floats):
-    #   The file progress (0.0 -> 1.0), empty list if n/a.
+    if len(files) != len(priorities) != len(progress):
+        # FIXME: Exception here
+        pass
 
-    # TODO: modify priorities
+    priorities_to_assign = [PRIORITY.high] * top + [PRIORITY.normal] * second
+
+    for priority in priorities_to_assign:
+        for file in files:
+            index = file.index
+
+            # There is no point in changing priority for the file that is:
+            #     • fully downloaded
+            #     • set to be skipped
+            #     • set to a higher priority
+            if progress[index] < 1.0 and PRIORITY.skip < priorities[index] < priority:
+                priorities[index] = priority
+
+                # Each priority should be assigned only once
+                continue
 
     torrent.set_file_priorities(priorities)
 
