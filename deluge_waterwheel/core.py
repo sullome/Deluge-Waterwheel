@@ -39,18 +39,6 @@ Priority = namedtuple("Priority", ["skip", "low", "normal", "high"])
 PRIORITY = Priority(0, 1, 4, 7)
 
 
-def get_torrent_ids_by_label(labeled_torrents, required_label):
-    """Extracts a list of torrent IDs from dictionary {torrent_id:label_id} by label."""
-
-    result = []
-
-    for torrent_id, label_id in labeled_torrents.items():
-        if label_id == required_label:
-            result.append(torrent_id)
-
-    return result
-
-
 def update_torrent_priorities(torrent_id, top=1, second=1):
     """Adjust files priorities for a specified torrent
 
@@ -109,8 +97,9 @@ class Core(CorePluginBase):
             "waterwheel.conf", DEFAULT_PREFS
         )
 
-        # TODO
         # Plugin "Labels" is required
+        if "Label" in component.get("CorePluginManager").get_enabled_plugins():
+            pass  # TODO: raise corresponding exception
 
         # TODO
         # It is possible that priorities does not work without pre-allocation.
@@ -129,36 +118,37 @@ class Core(CorePluginBase):
         #
         # I believe it is not needed, and 1 second is a good interval for now.
 
-        for label_id in self.config["labels"]:
-            torrent_ids = get_torrent_ids_by_label(TODO, label_id)
+        configured_labels = self.config["labels"]
 
-            known_torrents = []  # TODO
-            new_torrents = []  # TODO
+        # In UI there should be SessionProxy,
+        #   but because all this happens inside the core,
+        #   Core is used directly.
+        # Important part here is get_torrents_status,
+        #   which returns a {torrent_id: {key: value}} of torrents
+        #   that were filtered by configured_labels;
+        # FIXME: "name" is just a placeholder key, it is probably not needed at all
+        deferred = (
+            component.get("Core")
+            .get_torrents_status({"label": configured_labels}, "name")
+            .addCallback(self.update_torrents)
+        )
 
-            # FIXME
-            known_torrents = torrent_ids
+        # Deferred is an async thing, so the rest of the update will happen
+        # when the list of the torrents will be returned,
+        # in the update_torrents callback function.
+        #
+        # For the reference, this is twisted.internet.defer.Deferred object.
 
-            for torrent_id in new_torrents:
-                update_torrent_priorities(
-                    torrent_id,
-                    top=self.config["amount_top"],
-                    second=self.config["amount_second"],
-                )
-                known_torrents.append(torrent_id)
+    def update_torrents(self, labeled_torrents):
+        """Callback function that updates torrents in a received dict."""
 
-            for torrent_id in known_torrents:
-                # TODO
-                # Check that set interval is already passed
-                # It is safe to assume that each time this function is called,
-                # 1 second is passed.
-
-                # TODO
-                # Update priorities if it is time to do so
-                update_torrent_priorities(
-                    torrent_id,
-                    top=self.config["amount_top"],
-                    second=self.config["amount_second"],
-                )
+        # FIXME: This should probably work…
+        for torrent_id in labeled_torrents:
+            update_torrent_priorities(
+                torrent_id,
+                top=self.config["amount_top"],
+                second=self.config["amount_second"],
+            )
 
     @export
     def set_labels(self, labels):
