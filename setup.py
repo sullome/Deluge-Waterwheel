@@ -17,6 +17,20 @@ __description__ = ''
 __long_description__ = """"""
 __pkg_data__ = {'deluge_'+__plugin_name__.lower(): ['data/*']}
 
+import sys
+if sys.version_info < (3, 5):
+    error = """
+    {pkg} {ver} supports Python 3.5 and above.
+
+    Python {py} detected.
+
+    Try upgrading pip and retry.
+    """.format(pkg=__plugin_name__, ver=__version__, py='.'.join([str(v) for v in sys.version_info[:3]]))
+
+    print(error, file=sys.stderr)
+    sys.exit(1)
+
+
 setup(
     name=__plugin_name__,
     version=__version__,
