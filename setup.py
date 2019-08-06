@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (C) 2019 Constantine Farrahov <sullome.techie@gmail.com>
 #
 # Basic plugin template created by the Deluge Team.
@@ -30,6 +29,7 @@ setup(
 
     packages=find_packages(),
     package_data=__pkg_data__,
+    python_requires='>=3.5',
 
     entry_points="""
     [deluge.plugin.core]
