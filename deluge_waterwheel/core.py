@@ -38,6 +38,7 @@ def wrap_for_twisted(func):
     def wrapper(*args, **kwargs):
         coroutine = func(*args, **kwargs)
         return twisted.internet.defer.ensureDeferred(coroutine)
+
     return wrapper
 
 
@@ -92,6 +93,30 @@ def update_torrent_priorities(torrent_id, top=1, second=1):
     torrent.set_file_priorities(priorities)
 
 
+class PluginError(Exception):
+    """Base class for plugin exceptions"""
+
+    def __init__(self, message=None):
+        super().__init__(message)
+
+
+class PluginDependencyError(PluginError):
+    """Exception raised when plugin dependencies are not satisfied.
+
+    Attributes:
+        requirement --- what is needed
+        suggested_solution --- suggestion on how to meet the requirement
+    ­"""
+
+    def __init__(self, requirement, suggested_solution):
+        super().__init__(requirement)
+        self.requirement = f"{requirement} is required!"
+        self.suggested_solution = suggested_solution
+
+    def __str__(self):
+        return self.requirement + "\n" + self.suggested_solution
+
+
 class Core(CorePluginBase):
     def enable(self):
         log.info("*** Start Waterwheel plugin ***")
@@ -99,9 +124,13 @@ class Core(CorePluginBase):
             "waterwheel.conf", DEFAULT_PREFS
         )
 
-        # Plugin "Labels" is required
-        if "Label" in component.get("CorePluginManager").get_enabled_plugins():
-            pass  # TODO: raise corresponding exception
+        # Check that plugin Label is enabled
+        if "Label" not in component.get("CorePluginManager").get_enabled_plugins():
+            raise PluginDependencyError(
+                'Plugin "Label"',
+                "This is a default Deluge plugin,"
+                " so you should be able to enable it in the preferences.",
+            )
 
         # TODO
         # It is possible that priorities does not work without pre-allocation.
@@ -130,7 +159,9 @@ class Core(CorePluginBase):
         #   which returns a {torrent_id: {key: value}} of torrents
         #   that were filtered by configured_labels;
         # FIXME: "name" is just a placeholder key, it is probably not needed at all
-        labeled_torrents = await component.get("Core").get_torrents_status({"label": configured_labels}, "name")
+        labeled_torrents = await component.get("Core").get_torrents_status(
+            {"label": configured_labels}, "name"
+        )
 
         # FIXME: This should probably work…
         for torrent_id in labeled_torrents:
