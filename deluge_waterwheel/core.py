@@ -7,17 +7,11 @@
 # the OpenSSL library. See LICENSE for more details.
 import logging
 from collections import namedtuple
+from functools import wraps
 
-# noinspection PyPackageRequirements
 import deluge.configmanager
-
-# noinspection PyPackageRequirements
 from deluge import component
-
-# noinspection PyPackageRequirements
 from deluge.core.rpcserver import export
-
-# noinspection PyPackageRequirements
 from deluge.plugins.pluginbase import CorePluginBase
 
 log = logging.getLogger(__name__)
@@ -32,6 +26,19 @@ DEFAULT_PREFS = {
 # Values are given in deluge/core/torrent.py
 Priority = namedtuple("Priority", ["skip", "low", "normal", "high"])
 PRIORITY = Priority(0, 1, 4, 7)
+
+
+def wrap_for_twisted(func):
+    """This decorator is needed for async functions
+    to work with LoopingCall, maybeDeferred and other Twisted functions
+    that Deluge uses in component.Component.
+    """
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        coroutine = func(*args, **kwargs)
+        return twisted.internet.defer.ensureDeferred(coroutine)
+    return wrapper
 
 
 def update_torrent_priorities(torrent_id, top=1, second=1):
@@ -103,7 +110,8 @@ class Core(CorePluginBase):
     def disable(self):
         pass
 
-    def update(self):
+    @wrap_for_twisted
+    async def update(self):
         # TODO
         # In order to configure update frequency,
         # 'CorePluginBase > PluginBase' should be modified;
@@ -122,20 +130,7 @@ class Core(CorePluginBase):
         #   which returns a {torrent_id: {key: value}} of torrents
         #   that were filtered by configured_labels;
         # FIXME: "name" is just a placeholder key, it is probably not needed at all
-        deferred = (
-            component.get("Core")
-            .get_torrents_status({"label": configured_labels}, "name")
-            .addCallback(self.update_torrents)
-        )
-
-        # Deferred is an async thing, so the rest of the update will happen
-        # when the list of the torrents will be returned,
-        # in the update_torrents callback function.
-        #
-        # For the reference, this is twisted.internet.defer.Deferred object.
-
-    def update_torrents(self, labeled_torrents):
-        """Callback function that updates torrents in a received dict."""
+        labeled_torrents = await component.get("Core").get_torrents_status({"label": configured_labels}, "name")
 
         # FIXME: This should probably work…
         for torrent_id in labeled_torrents:
