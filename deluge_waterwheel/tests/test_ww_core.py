@@ -8,13 +8,19 @@ import pytest
 import pytest_twisted
 import warnings
 
-import deluge.component as component
-from deluge.ui.client import client as standalone_client
+from deluge import component
+from deluge import configmanager
+from deluge.ui.client import Client
 
+# install python3-pytest_twisted
+# pip3 install deluge
+# install rb_libtorrent-python3
 
 @pytest.fixture
-async def started_deluge_client(tmpdir):
+def started_deluge_client(tmpdir):
     # Set Up
+    standalone_client = Client()
+
     if len(component._ComponentRegistry.components) != 0:
         warnings.warn(
             'The component._ComponentRegistry.components'
@@ -24,18 +30,27 @@ async def started_deluge_client(tmpdir):
             f' {component._ComponentRegistry.components}'
         )
 
-    deluge.configmanager.set_config_dir(tmpdir)
+    configmanager.set_config_dir(tmpdir)
     standalone_client.start_standalone()
 
-    await component.start()
+    pytest_twisted.blockon(component.start())
     yield standalone_client
 
     # Tear Down
     standalone_client.stop_standalone()
 
-    await component.shutdown()
+    pytest_twisted.blockon(component.shutdown())
+    # There can be KeyErrors after pytest run about RPCServer
+    # This errors are happening because of this shutdown.
+
     component._ComponentRegistry.components.clear()
     component._ComponentRegistry.dependents.clear()
+
+
+@pytest_twisted.ensureDeferred
+async def test_plugin_is_known(started_deluge_client, caplog):
+    await started_deluge_client.core.enable_plugin('Waterwheel')
+    assert "Cannot enable non-existant plugin" not in caplog.text
 
 
 @pytest_twisted.ensureDeferred
@@ -52,70 +67,14 @@ async def test_not_enabled_without_preallocation(started_deluge_client):
 
 
 @pytest_twisted.ensureDeferred
+async def test_label_can_be_enabled(started_deluge_client):
+    enabled = await started_deluge_client.core.enable_plugin('Label')
+    assert enabled
+
+
+@pytest_twisted.ensureDeferred
 async def test_enabled_with_label_and_preallocation(started_deluge_client):
     await started_deluge_client.core.enable_plugin('Label')
     started_deluge_client.core.set_config({'pre_allocate_storage': True})
     enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
     assert enabled
-
-# @pytest_twisted.ensureDeferred
-# async def test_good(deluge_client_started):
-#     # res = await something()
-#     # assert res == good
-#     pass
-
-# TODO: remove this reference material
-# class WaterwheelTestCase(unittest.TestCase):
-#     """
-#     this is from deluge.tests BaseTestCase
-#
-#     This is the base class that should be used for all test classes
-#     that create classes that inherit from deluge.component.Component. It
-#     ensures that the component registry has been cleaned up when tests
-#     have finished.
-#
-#     """
-#
-#     def setUp(self):  # NOQA: N803
-#
-#         if len(component._ComponentRegistry.components) != 0:
-#             warnings.warn(
-#                 'The component._ComponentRegistry.components is not empty on test setup.\n'
-#                 'This is probably caused by another test that did not clean up after finishing!: %s'
-#                 % component._ComponentRegistry.components
-#             )
-#         d = maybeDeferred(self.set_up)
-#
-#         def on_setup_error(error):
-#             warnings.warn('Error caught in test setup!\n%s' % error.getTraceback())
-#             self.fail()
-#
-#         return d.addErrback(on_setup_error)
-#
-#     def tearDown(self):  # NOQA: N803
-#         d = maybeDeferred(self.tear_down)
-#
-#         def on_teardown_failed(error):
-#             warnings.warn('Error caught in test teardown!\n%s' % error.getTraceback())
-#             self.fail()
-#
-#         def on_teardown_complete(result):
-#             component._ComponentRegistry.components.clear()
-#             component._ComponentRegistry.dependents.clear()
-#
-#         return d.addCallbacks(on_teardown_complete, on_teardown_failed)
-#
-#     def set_up(self, tmpdir):
-#         # defer.setDebugging(True)
-#         deluge.configmanager.set_config_dir(tmpdir)
-#         client.start_standalone()
-#         client.core.enable_plugin('Waterwheel')
-#         return component.start()
-#
-#     def tear_down(self):
-#         client.stop_standalone()
-#         return component.shutdown()
-#
-#     @pytest_twisted.inlineCallbacks
-#     def test_sometest(self):
-#         pass
