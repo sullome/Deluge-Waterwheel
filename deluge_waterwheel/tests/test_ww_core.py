@@ -9,11 +9,11 @@ import pytest_twisted
 import warnings
 
 import deluge.component as component
-from deluge.ui.client import client
+from deluge.ui.client import client as standalone_client
 
 
 @pytest.fixture
-async def deluge_client_started(tmpdir):
+async def started_deluge_client(tmpdir):
     # Set Up
     if len(component._ComponentRegistry.components) != 0:
         warnings.warn(
@@ -25,14 +25,13 @@ async def deluge_client_started(tmpdir):
         )
 
     deluge.configmanager.set_config_dir(tmpdir)
-    client.start_standalone()
-    client.core.enable_plugin('Waterwheel')
+    standalone_client.start_standalone()
 
     await component.start()
-    yield
+    yield standalone_client
 
     # Tear Down
-    client.stop_standalone()
+    standalone_client.stop_standalone()
 
     await component.shutdown()
     component._ComponentRegistry.components.clear()
@@ -40,14 +39,35 @@ async def deluge_client_started(tmpdir):
 
 
 @pytest_twisted.ensureDeferred
-async def test_good(deluge_client_started):
-    # res = await something()
-    # assert res == good
-    pass
+async def test_not_enabled_without_label(started_deluge_client):
+    enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
+    assert not enabled
 
+
+@pytest_twisted.ensureDeferred
+async def test_not_enabled_without_preallocation(started_deluge_client):
+    started_deluge_client.core.set_config({'pre_allocate_storage': False})
+    enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
+    assert not enabled
+
+
+@pytest_twisted.ensureDeferred
+async def test_enabled_with_label_and_preallocation(started_deluge_client):
+    await started_deluge_client.core.enable_plugin('Label')
+    started_deluge_client.core.set_config({'pre_allocate_storage': True})
+    enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
+    assert enabled
+
+# @pytest_twisted.ensureDeferred
+# async def test_good(deluge_client_started):
+#     # res = await something()
+#     # assert res == good
+#     pass
+
+# TODO: remove this reference material
 # class WaterwheelTestCase(unittest.TestCase):
 #     """
-#     TODO: this is from deluge.tests BaseTestCase - check if needed at all
+#     this is from deluge.tests BaseTestCase
 #
 #     This is the base class that should be used for all test classes
 #     that create classes that inherit from deluge.component.Component. It
@@ -56,7 +76,6 @@ async def test_good(deluge_client_started):
 #
 #     """
 #
-#     # TODO: this is from deluge.tests BaseTestCase - check if needed at all
 #     def setUp(self):  # NOQA: N803
 #
 #         if len(component._ComponentRegistry.components) != 0:
@@ -73,7 +92,6 @@ async def test_good(deluge_client_started):
 #
 #         return d.addErrback(on_setup_error)
 #
-#     # TODO: this is from deluge.tests BaseTestCase - check if needed at all
 #     def tearDown(self):  # NOQA: N803
 #         d = maybeDeferred(self.tear_down)
 #
