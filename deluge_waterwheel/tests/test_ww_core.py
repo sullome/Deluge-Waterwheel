@@ -16,6 +16,7 @@ from deluge.ui.client import Client
 # pip3 install deluge
 # install rb_libtorrent-python3
 
+
 @pytest.fixture
 def started_deluge_client(tmpdir):
     # Set Up
