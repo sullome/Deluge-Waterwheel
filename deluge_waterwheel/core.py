@@ -96,25 +96,13 @@ def update_torrent_priorities(torrent_id, top=1, second=1):
 class PluginError(Exception):
     """Base class for plugin exceptions"""
 
-    def __init__(self, message=None):
-        super().__init__(message)
+    pass
 
 
 class PluginDependencyError(PluginError):
-    """Exception raised when plugin dependencies are not satisfied.
+    """Exception raised when plugin dependencies are not satisfied"""
 
-    Attributes:
-        requirement --- what is needed
-        suggested_solution --- suggestion on how to meet the requirement
-    ­"""
-
-    def __init__(self, requirement, suggested_solution):
-        super().__init__(requirement)
-        self.requirement = f"{requirement} is required!"
-        self.suggested_solution = suggested_solution
-
-    def __str__(self):
-        return self.requirement + "\n" + self.suggested_solution
+    pass
 
 
 class Core(CorePluginBase):
@@ -127,9 +115,9 @@ class Core(CorePluginBase):
         # Check that plugin Label is enabled
         if "Label" not in component.get("CorePluginManager").get_enabled_plugins():
             raise PluginDependencyError(
-                'Plugin "Label"',
-                "This is a default Deluge plugin,"
-                " so you should be able to enable it in the preferences.",
+                'Plugin "Label" is not enabled!'
+                "\nThis plugin is required for Waterwheel to work."
+                " Please enable Label in the preferences."
             )
 
         # TODO
