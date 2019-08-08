@@ -9,6 +9,8 @@ import logging
 from collections import namedtuple
 from functools import wraps
 
+from twisted.internet.defer import ensureDeferred
+
 import deluge.configmanager
 from deluge import component
 from deluge.core.rpcserver import export
@@ -37,7 +39,7 @@ def wrap_for_twisted(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         coroutine = func(*args, **kwargs)
-        return twisted.internet.defer.ensureDeferred(coroutine)
+        return ensureDeferred(coroutine)
 
     return wrapper
 
