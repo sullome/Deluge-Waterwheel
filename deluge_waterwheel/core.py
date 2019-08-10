@@ -167,10 +167,10 @@ class Core(CorePluginBase):
             )
 
     @export
-    def set_labels(self, labels):
+    def track_labels(self, labels):
         """Specifies labels that should be tracked"""
 
-        # TODO
+        # TODO: labels should be a set
         pass
 
     @export
