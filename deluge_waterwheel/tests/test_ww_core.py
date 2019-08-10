@@ -61,16 +61,17 @@ async def test_not_enabled_without_label(started_deluge_client):
 
 
 @pytest_twisted.ensureDeferred
-async def test_not_enabled_without_preallocation(started_deluge_client):
-    started_deluge_client.core.set_config({'pre_allocate_storage': False})
-    enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
-    assert not enabled
-
-
-@pytest_twisted.ensureDeferred
 async def test_label_can_be_enabled(started_deluge_client):
     enabled = await started_deluge_client.core.enable_plugin('Label')
     assert enabled
+
+
+@pytest_twisted.ensureDeferred
+async def test_not_enabled_without_preallocation(started_deluge_client):
+    await started_deluge_client.core.enable_plugin('Label')
+    started_deluge_client.core.set_config({'pre_allocate_storage': False})
+    enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
+    assert not enabled
 
 
 @pytest_twisted.ensureDeferred
