@@ -110,11 +110,12 @@ class PluginDependencyError(PluginError):
 class Core(CorePluginBase):
     def enable(self):
         log.info("*** Start Waterwheel plugin ***")
+
+        self.core = component.get("Core")
         self.config = deluge.configmanager.ConfigManager(
             "waterwheel.conf", DEFAULT_PREFS
         )
 
-        # Check that plugin Label is enabled
         if "Label" not in component.get("CorePluginManager").get_enabled_plugins():
             raise PluginDependencyError(
                 'Plugin "Label" is not enabled!'
@@ -122,9 +123,13 @@ class Core(CorePluginBase):
                 " Please enable Label in the preferences."
             )
 
-        # TODO
-        # It is possible that priorities does not work without pre-allocation.
-        # If it is true, than check if pre-allocation is enabled should be made.
+        if self.core.get_config_value("pre_allocate_storage") is not True:
+            # TODO: It is unclear whether this is actually needed or not
+            raise PluginDependencyError(
+                'Pre-allocation is not enabled!'
+                '\nThis property is required for priorities to work.'
+                ' Please enable pre-allocation in the preferences.'
+            )
 
     def disable(self):
         pass
@@ -149,7 +154,7 @@ class Core(CorePluginBase):
         #   which returns a {torrent_id: {key: value}} of torrents
         #   that were filtered by configured_labels;
         # FIXME: "name" is just a placeholder key, it is probably not needed at all
-        labeled_torrents = await component.get("Core").get_torrents_status(
+        labeled_torrents = await self.core.get_torrents_status(
             {"label": configured_labels}, "name"
         )
 
