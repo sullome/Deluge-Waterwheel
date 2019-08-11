@@ -25,11 +25,11 @@ def started_deluge_client(tmpdir):
 
     if len(component._ComponentRegistry.components) != 0:
         warnings.warn(
-            'The component._ComponentRegistry.components'
-            ' is not empty on test setup.\n'
-            'This is probably caused by another test'
-            ' that did not clean up after finishing!:'
-            f' {component._ComponentRegistry.components}'
+            "The component._ComponentRegistry.components"
+            " is not empty on test setup.\n"
+            "This is probably caused by another test"
+            " that did not clean up after finishing!:"
+            f" {component._ComponentRegistry.components}"
         )
 
     configmanager.set_config_dir(tmpdir)
@@ -51,9 +51,9 @@ def started_deluge_client(tmpdir):
 
 @pytest.fixture
 def enabled_plugins(started_deluge_client):
-    started_deluge_client.core.set_config({'pre_allocate_storage': True})
-    pytest_twisted.blockon(started_deluge_client.core.enable_plugin('Label'))
-    pytest_twisted.blockon(started_deluge_client.core.enable_plugin('Waterwheel'))
+    started_deluge_client.core.set_config({"pre_allocate_storage": True})
+    pytest_twisted.blockon(started_deluge_client.core.enable_plugin("Label"))
+    pytest_twisted.blockon(started_deluge_client.core.enable_plugin("Waterwheel"))
     setup_translation()
 
     yield
@@ -65,35 +65,35 @@ def enabled_plugins(started_deluge_client):
 
 @pytest_twisted.ensureDeferred
 async def test_plugin_is_known(started_deluge_client, caplog):
-    await started_deluge_client.core.enable_plugin('Waterwheel')
+    await started_deluge_client.core.enable_plugin("Waterwheel")
     assert "Cannot enable non-existant plugin" not in caplog.text
 
 
 @pytest_twisted.ensureDeferred
 async def test_not_enabled_without_label(started_deluge_client):
-    enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
+    enabled = await started_deluge_client.core.enable_plugin("Waterwheel")
     assert not enabled
 
 
 @pytest_twisted.ensureDeferred
 async def test_label_can_be_enabled(started_deluge_client):
-    enabled = await started_deluge_client.core.enable_plugin('Label')
+    enabled = await started_deluge_client.core.enable_plugin("Label")
     assert enabled
 
 
 @pytest_twisted.ensureDeferred
 async def test_not_enabled_without_preallocation(started_deluge_client):
-    await started_deluge_client.core.enable_plugin('Label')
-    started_deluge_client.core.set_config({'pre_allocate_storage': False})
-    enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
+    await started_deluge_client.core.enable_plugin("Label")
+    started_deluge_client.core.set_config({"pre_allocate_storage": False})
+    enabled = await started_deluge_client.core.enable_plugin("Waterwheel")
     assert not enabled
 
 
 @pytest_twisted.ensureDeferred
 async def test_enabled_with_label_and_preallocation(started_deluge_client):
-    started_deluge_client.core.set_config({'pre_allocate_storage': True})
-    await started_deluge_client.core.enable_plugin('Label')
-    enabled = await started_deluge_client.core.enable_plugin('Waterwheel')
+    started_deluge_client.core.set_config({"pre_allocate_storage": True})
+    await started_deluge_client.core.enable_plugin("Label")
+    enabled = await started_deluge_client.core.enable_plugin("Waterwheel")
     assert enabled
 
 
@@ -103,7 +103,7 @@ async def test_label_added_correctly(enabled_plugins):
     label_plugin = component.get("CorePlugin.Label")
     assert label_plugin.get_labels() == []
 
-    known_labels = {'sequential', 'one-by-one', 'auto-priority'}
+    known_labels = {"sequential", "one-by-one", "auto-priority"}
     for label in known_labels:
         label_plugin.add(label)
 
@@ -111,7 +111,7 @@ async def test_label_added_correctly(enabled_plugins):
     ww.track_label(new_label)
 
     needed_labels = {new_label}
-    assert needed_labels == ww.config["labels"]
+    assert needed_labels == ww._tracked_labels
 
 
 @pytest_twisted.ensureDeferred
@@ -120,7 +120,7 @@ async def test_label_removed_correctly(enabled_plugins):
     label_plugin = component.get("CorePlugin.Label")
     assert label_plugin.get_labels() == []
 
-    known_labels = {'sequential', 'one-by-one', 'auto-priority'}
+    known_labels = {"sequential", "one-by-one", "auto-priority"}
     for label in known_labels:
         label_plugin.add(label)
         ww.track_label(label)
@@ -128,20 +128,16 @@ async def test_label_removed_correctly(enabled_plugins):
     needed_labels = known_labels
     wrong_label = needed_labels.pop()
     ww.untrack_label(wrong_label)
-    assert needed_labels == ww.config["labels"]
+    assert needed_labels == ww._tracked_labels
 
 
 @pytest_twisted.ensureDeferred
 async def test_unknown_label_not_added(enabled_plugins):
-    started_deluge_client.core.set_config({'pre_allocate_storage': True})
-    await started_deluge_client.core.enable_plugin('Label')
-    await started_deluge_client.core.enable_plugin('Waterwheel')
-    setup_translation()
     ww = component.get("CorePlugin.Waterwheel")
     label_plugin = component.get("CorePlugin.Label")
     assert label_plugin.get_labels() == []
 
-    known_labels = {'sequential', 'one-by-one', 'auto-priority'}
+    known_labels = {"sequential", "one-by-one", "auto-priority"}
     test_label = known_labels.pop()
 
     for label in known_labels:

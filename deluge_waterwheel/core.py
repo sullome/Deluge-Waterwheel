@@ -18,13 +18,6 @@ from deluge.plugins.pluginbase import CorePluginBase
 
 log = logging.getLogger(__name__)
 
-DEFAULT_PREFS = {
-    "order": "alphabetical",  # TODO: put to use
-    "labels": [],
-    "amount_top": 1,
-    "amount_second": 2,
-}
-
 # Values are given in deluge/core/torrent.py
 Priority = namedtuple("Priority", ["skip", "low", "normal", "high"])
 PRIORITY = Priority(0, 1, 4, 7)
@@ -42,6 +35,122 @@ def wrap_for_twisted(func):
         return ensureDeferred(coroutine)
 
     return wrapper
+
+
+class PluginError(Exception):
+    """Base class for plugin exceptions"""
+
+    pass
+
+
+class PluginDependencyError(PluginError):
+    """Exception raised when plugin dependencies are not satisfied"""
+
+    pass
+
+
+class Core(CorePluginBase):
+    def __init__(self, plugin_name):
+        super().__init__(plugin_name)
+
+        self._tracked_labels = set()
+        self._label_plugin = None
+        self.DEFAULT_PREFS = {
+            "order": "alphabetical",  # TODO: put to use
+            "amount_top": 1,
+            "amount_second": 2,
+        }
+
+    def enable(self):
+        log.info("*** Start Waterwheel plugin ***")
+
+        self.core = component.get("Core")
+        self.config = deluge.configmanager.ConfigManager(
+            "waterwheel.conf", self.DEFAULT_PREFS
+        )
+
+        if "tracked_labels" in self.config:
+            self._tracked_labels = self.config["tracked_labels"].copy()
+
+        if "Label" not in component.get("CorePluginManager").get_enabled_plugins():
+            raise PluginDependencyError(
+                'Plugin "Label" is not enabled!'
+                "\nThis plugin is required for Waterwheel to work."
+                " Please enable Label in the preferences."
+            )
+        else:
+            self._label_plugin = component.get("CorePlugin.Label")
+
+        if self.core.get_config_value("pre_allocate_storage") is not True:
+            # TODO: It is unclear whether this is actually needed or not
+            raise PluginDependencyError(
+                "Pre-allocation is not enabled!"
+                "\nThis property is required for priorities to work."
+                " Please enable pre-allocation in the preferences."
+            )
+
+    def disable(self):
+        pass
+
+    @wrap_for_twisted
+    async def update(self):
+        # TODO
+        # In order to configure update frequency,
+        # 'CorePluginBase > PluginBase' should be modified;
+        # PluginBase is based on Component,
+        # so it should be easy to base this class directly on Component.
+        # BTW, Component runs update() with twisted LoopingCall().
+        #
+        # I believe it is not needed, and 1 second is a good interval for now.
+
+        # In UI there should be SessionProxy,
+        #   but because all this happens inside the core,
+        #   Core is used directly.
+        # Important part here is get_torrents_status,
+        #   which returns a {torrent_id: {key: value}} of torrents
+        #   that were filtered by configured_labels;
+        # FIXME: "name" is just a placeholder key, it is probably not needed at all
+        labeled_torrents = await self.core.get_torrents_status(
+            {"label": list(self._tracked_labels)}, "name"
+        )
+
+        # FIXME: This should probably work…
+        for torrent_id in labeled_torrents:
+            update_torrent_priorities(
+                torrent_id,
+                top=self.config["amount_top"],
+                second=self.config["amount_second"],
+            )
+
+    @export
+    def track_label(self, label):
+        """Specifies labels that should be tracked"""
+
+        if label in self._label_plugin.get_labels():
+            self._tracked_labels.add(label)
+        else:
+            raise KeyError(
+                f"No such label: {label}"
+                "\nPlease try to add this label in the Label plugin."
+            )
+
+    @export
+    def untrack_label(self, label):
+        """Specifies labels that should be tracked"""
+
+        self._tracked_labels.discard(label)
+
+    @export
+    def set_config(self, config):
+        """Sets the config dictionary"""
+        for key in config:
+            self.config[key] = config[key]
+        self.config.save()
+
+    @export
+    def get_config(self):
+        """Returns the config dictionary"""
+        return self.config.config
 
 
 def update_torrent_priorities(torrent_id, top=1, second=1):
@@ -93,94 +202,3 @@ def update_torrent_priorities(torrent_id, top=1, second=1):
                 continue
 
     torrent.set_file_priorities(priorities)
-
-
-class PluginError(Exception):
-    """Base class for plugin exceptions"""
-
-    pass
-
-
-class PluginDependencyError(PluginError):
-    """Exception raised when plugin dependencies are not satisfied"""
-
-    pass
-
-
-class Core(CorePluginBase):
-    def enable(self):
-        log.info("*** Start Waterwheel plugin ***")
-
-        self.core = component.get("Core")
-        self.config = deluge.configmanager.ConfigManager(
-            "waterwheel.conf", DEFAULT_PREFS
-        )
-
-        if "Label" not in component.get("CorePluginManager").get_enabled_plugins():
-            raise PluginDependencyError(
-                'Plugin "Label" is not enabled!'
-                "\nThis plugin is required for Waterwheel to work."
-                " Please enable Label in the preferences."
-            )
-
-        if self.core.get_config_value("pre_allocate_storage") is not True:
-            # TODO: It is unclear whether this is actually needed or not
-            raise PluginDependencyError(
-                'Pre-allocation is not enabled!'
-                '\nThis property is required for priorities to work.'
-                ' Please enable pre-allocation in the preferences.'
-            )
-
-    def disable(self):
-        pass
-
-    @wrap_for_twisted
-    async def update(self):
-        # TODO
-        # In order to configure update frequency,
-        # 'CorePluginBase > PluginBase' should be modified;
-        # PluginBase is based on Component,
-        # so it should be easy to base this class directly on Component.
-        # BTW, Component runs update() with twisted LoopingCall().
-        #
-        # I believe it is not needed, and 1 second is a good interval for now.
-
-        configured_labels = self.config["labels"]
-
-        # In UI there should be SessionProxy,
-        #   but because all this happens inside the core,
-        #   Core is used directly.
-        # Important part here is get_torrents_status,
-        #   which returns a {torrent_id: {key: value}} of torrents
-        #   that were filtered by configured_labels;
-        # FIXME: "name" is just a placeholder key, it is probably not needed at all
-        labeled_torrents = await self.core.get_torrents_status(
-            {"label": configured_labels}, "name"
-        )
-
-        # FIXME: This should probably work…
-        for torrent_id in labeled_torrents:
-            update_torrent_priorities(
-                torrent_id,
-                top=self.config["amount_top"],
-                second=self.config["amount_second"],
-            )
-
-    @export
-    def track_labels(self, labels):
-        """Specifies labels that should be tracked"""
-
-        # TODO: labels should be a set
-        pass
-
-    @export
-    def set_config(self, config):
-        """Sets the config dictionary"""
-        for key in config:
-            self.config[key] = config[key]
-        self.config.save()
-
-    @export
-    def get_config(self):
-        """Returns the config dictionary"""
-        return self.config.config
