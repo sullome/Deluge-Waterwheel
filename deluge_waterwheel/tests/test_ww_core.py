@@ -39,11 +39,32 @@ def started_deluge_client(tmpdir):
     yield standalone_client
 
     # Tear Down
-    standalone_client.stop_standalone()
-
+    pytest_twisted.blockon(standalone_client.disconnect())
     pytest_twisted.blockon(component.shutdown())
+
     # There can be KeyErrors after pytest run about RPCServer
-    # This errors are happening because of this shutdown.
+    # This errors are happening because of the next clear()
+    #
+    # It is so because plugins objects (that are based on CorePluginBase)
+    # are still stored inside RPCServer's factory.methods
+    # When RPCServer object is destroyed, it's dicts are cleared as well
+    # That's when CorePluginBase.__del__ is called
+    # And it tries to obtain RPCServer object from a list of components,
+    # but this object already excluded from the list, so it fails to
+    # deregister itself from RPCServer's dicts.
+    #
+    # Moreover, calling RPCServer's deregister_object is of no use, because:
+    # def deregister_object(self, obj):
+    #     """
+    #     Deregisters an objects exported rpc methods.
+    #
+    #     :param obj: the object that was previously registered
+    #
+    #     """
+    # >       for key, value in self.factory.methods.items():
+    #             if value.__self__ == obj:
+    #                 del self.factory.methods[key]
+    # E       RuntimeError: dictionary changed size during iteration
 
     component._ComponentRegistry.components.clear()
     component._ComponentRegistry.dependents.clear()
