@@ -84,6 +84,16 @@ def enabled_plugins(started_deluge_client):
         label_plugin.remove(label)
 
 
+@pytest.fixture
+def added_torrent(enabled_plugins):
+    torrent_file = "data/test.torrent"
+    torrent_manager = component.get("TorrentManager")
+    torrent_info = torrent_manager.get_torrent_info_from_file("data/test.torrent")
+    torrent_manager.add(torrent_info=torrent_info, filename=torrent_file)
+
+    yield
+
+
 @pytest_twisted.ensureDeferred
 async def test_plugin_is_known(started_deluge_client, caplog):
     await started_deluge_client.core.enable_plugin("Waterwheel")
